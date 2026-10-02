@@ -1,0 +1,20 @@
+module CreateImage
+import { <Image>, <IO>, <Prelude.Result>, <Prelude.Panic> }
+use Result.{
+    Result
+}
+
+def Require = fn<T>(result: Result<T, Image::ImageError>) -> T => {
+    match result with
+        case Result::Ok(value) => value
+        case Result::Err(error) => Panic::Panic(error.message)
+};
+
+def image = Require(Image::Create(256, 256, Image::Color(32, 64, 128, 255)));
+Require(Image::SetPixel(image, 128, 128, Image::Color(255, 255, 255, 255)));
+Require(Image::Write(image, "target/example.png"));
+Require(Image::Close(image));
+
+def loaded = Require(Image::Read("target/example.png"));
+IO::PrintLine("Saved " ++ (Require(Image::Width(loaded)) as Text) ++ " x " ++ (Require(Image::Height(loaded)) as Text) ++ " PNG");
+Require(Image::Close(loaded));

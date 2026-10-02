@@ -1,0 +1,52 @@
+name: Check packages
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Packages (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            compiler: g++-14
+          - os: windows-2025
+            compiler: cl
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Discover packages
+        id: packages
+        run: python scripts/check.py --github-output
+      - name: Check out Marmot
+        if: steps.packages.outputs.has_packages == 'true'
+        uses: actions/checkout@v6
+        with:
+          repository: ZhongLienong/Marmot
+          ref: 797891d921f38d04c72fda48184feafc38a3f70a
+          path: .toolchain/Marmot
+          persist-credentials: false
+      - name: Set up Rust
+        if: steps.packages.outputs.has_packages == 'true'
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal --component rustfmt --component clippy
+          rustup override set 1.88.0
+      - name: Build Marmot
+        if: steps.packages.outputs.has_packages == 'true'
+        env:
+          CXX: ${{ matrix.compiler }}
+        run: python .toolchain/Marmot/scripts/dev.py build compiler vm tool --build Release
+      - name: Check packages
+        run: python scripts/check.py --toolchain .toolchain/Marmot

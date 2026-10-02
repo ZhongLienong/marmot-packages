@@ -1,0 +1,87 @@
+module Image
+import { <Prelude.Result> }
+use Result.{
+    Result
+}
+public export { Image, Color, ImageError, Read, Create, Width, Height, GetPixel, SetPixel, Write, WriteJpeg, Close }
+
+type Image = Int;
+
+type Color = {
+    r: Int,
+    g: Int,
+    b: Int,
+    a: Int
+};
+
+type ImageError = {
+    message: Text
+};
+
+foreign "marmot_image_create" CreateRaw: fn(Int, Int, Int) -> Int from "marmot_image";
+
+foreign "marmot_image_read" ReadRaw: fn(Text) -> Int from "marmot_image";
+
+foreign "marmot_image_width" WidthRaw: fn(Int) -> Int from "marmot_image";
+
+foreign "marmot_image_height" HeightRaw: fn(Int) -> Int from "marmot_image";
+
+foreign "marmot_image_get_pixel" GetPixelRaw: fn(Int, Int, Int) -> Int from "marmot_image";
+
+foreign "marmot_image_set_pixel" SetPixelRaw: fn(Int, Int, Int, Int) -> Int from "marmot_image";
+
+foreign "marmot_image_write" WriteRaw: fn(Int, Text) -> Int from "marmot_image";
+
+foreign "marmot_image_write_jpeg" WriteJpegRaw: fn(Int, Text, Int) -> Int from "marmot_image";
+
+foreign "marmot_image_close" CloseRaw: fn(Int) -> Int from "marmot_image";
+
+foreign "marmot_image_error_length" ErrorLengthRaw: fn() -> Int from "marmot_image";
+
+foreign "marmot_image_error_character" ErrorCharacterRaw: fn(Int) -> Int from "marmot_image";
+
+foreign "MIDORI_FFI_TextFromCodePoint" TextFromCodePointRaw: fn(Int) -> Text;
+
+def ErrorCharacters = fn(index: Int, length: Int, text: Text) -> Text => {
+    if index == length then text else ErrorCharacters(index + 1, length, text ++ TextFromCodePointRaw(ErrorCharacterRaw(index)))
+};
+
+def Checked = fn<T>(status: Int, convert: fn(Int) -> T) -> Result<T, ImageError> => {
+    if status < 0 then Result::Err(ImageError(ErrorCharacters(0, ErrorLengthRaw(), ""))) else Result::Ok(convert(status))
+};
+
+def IsChannel = fn(value: Int) -> Bool => (value >= 0) && (value <= 255);
+
+def PackColor = fn(color: Color) -> Result<Int, ImageError> => {
+    if IsChannel(color.r) && IsChannel(color.g) && IsChannel(color.b) && IsChannel(color.a) then Result::Ok((color.r * 16777216) + (color.g * 65536) + (color.b * 256) + color.a) else Result::Err(ImageError("color channels must be between 0 and 255"))
+};
+
+def UnpackColor = fn(value: Int) -> Color => Color(value / 16777216, (value / 65536) % 256, (value / 256) % 256, value % 256);
+
+def Read = fn(path: Text) -> Result<Image, ImageError> => {
+    Checked(ReadRaw(path), fn(handle: Int) -> Image => handle as Image)
+};
+
+def Create = fn(width: Int, height: Int, color: Color) -> Result<Image, ImageError> => {
+    match PackColor(color) with
+        case Result::Ok(packed) => Checked(CreateRaw(width, height, packed), fn(handle: Int) -> Image => handle as Image)
+        case Result::Err(error) => Result::Err(error)
+};
+
+def Width = fn(image: Image) -> Result<Int, ImageError> => Checked(WidthRaw(image as Int), fn(value: Int) -> Int => value);
+
+def Height = fn(image: Image) -> Result<Int, ImageError> => Checked(HeightRaw(image as Int), fn(value: Int) -> Int => value);
+
+def GetPixel = fn(image: Image, x: Int, y: Int) -> Result<Color, ImageError> => Checked(GetPixelRaw(image as Int, x, y), UnpackColor);
+
+def SetPixel = fn(image: Image, x: Int, y: Int, color: Color) -> Result<Unit, ImageError> => {
+    match PackColor(color) with
+        case Result::Ok(packed) => Checked(SetPixelRaw(image as Int, x, y, packed), fn(_: Int) -> Unit => ())
+        case Result::Err(error) => Result::Err(error)
+};
+
+def Write = fn(image: Image, path: Text) -> Result<Unit, ImageError> => Checked(WriteRaw(image as Int, path), fn(_: Int) -> Unit => ());
+
+def WriteJpeg = fn(image: Image, path: Text, quality: Int) -> Result<Unit, ImageError> => Checked(WriteJpegRaw(image as Int, path, quality), fn(_: Int) -> Unit => ());
+
+def Close = fn(image: Image) -> Result<Unit, ImageError> => Checked(CloseRaw(image as Int), fn(_: Int) -> Unit => ());

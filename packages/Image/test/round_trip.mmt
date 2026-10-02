@@ -1,0 +1,38 @@
+module ImageRoundTrip
+import { <Image>, <IO>, <Prelude.Result>, <Prelude.Panic> }
+use Result.{
+    Result
+}
+
+def Assert = fn(condition: Bool, message: Text) -> Unit => {
+    if condition then () else Panic::Panic(message)
+};
+
+def Require = fn<T>(result: Result<T, Image::ImageError>) -> T => {
+    match result with
+        case Result::Ok(value) => value
+        case Result::Err(error) => Panic::Panic(error.message)
+};
+
+def RoundTrip = fn(image: Image::Image, path: Text) -> Unit => {
+    Require(Image::Write(image, path));
+    def loaded = Require(Image::Read(path));
+    Assert(Require(Image::Width(loaded)) == 2, "width");
+    Assert(Require(Image::Height(loaded)) == 3, "height");
+    def changed = Require(Image::GetPixel(loaded, 1, 0));
+    Assert(changed.r == 18, "red");
+    Assert(changed.g == 52, "green");
+    Assert(changed.b == 86, "blue");
+    Assert(changed.a == 120, "alpha");
+    def filled = Require(Image::GetPixel(loaded, 0, 2));
+    Assert(filled.r == 255, "fill red");
+    Assert(filled.a == 255, "fill alpha");
+    Require(Image::Close(loaded));
+};
+
+def image = Require(Image::Create(2, 3, Image::Color(255, 0, 0, 255)));
+Require(Image::SetPixel(image, 1, 0, Image::Color(18, 52, 86, 120)));
+RoundTrip(image, "target/画像-roundtrip.png");
+RoundTrip(image, "target/画像-roundtrip.webp");
+Require(Image::Close(image));
+IO::PrintLine("PNG and WebP preserve RGBA pixels");

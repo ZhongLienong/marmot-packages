@@ -1,0 +1,7 @@
+/.toolchain/
+/target/
+__pycache__/
+*.py[cod]
+*.mmc
+/packages/*/target/
+/packages/*/packages/

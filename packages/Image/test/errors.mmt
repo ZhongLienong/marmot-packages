@@ -1,0 +1,48 @@
+module ImageErrors
+import { <Image>, <IO>, <TextUtil>, <Prelude.Result>, <Prelude.Panic> }
+use Result.{
+    Result
+}
+
+def Require = fn<T>(result: Result<T, Image::ImageError>) -> T => {
+    match result with
+        case Result::Ok(value) => value
+        case Result::Err(error) => Panic::Panic(error.message)
+};
+
+def Error = fn<T>(result: Result<T, Image::ImageError>, contains: Text) -> Unit => {
+    match result with
+        case Result::Ok(_) => Panic::Panic("expected image error: " ++ contains)
+        case Result::Err(error) => {
+            if TextUtil::Contains(error.message, contains) then () else Panic::Panic("unexpected error: " ++ error.message)
+        }
+};
+
+def black = Image::Color(0, 0, 0, 255);
+Error(Image::Read("target/不存在-missing.png"), "不存在-missing.png");
+Error(Image::Create(0, 1, black), "positive");
+Error(Image::Create(-1, 1, black), "width");
+Error(Image::Create(4294967295, 4294967295, black), "256 MiB");
+Error(Image::Create(1, 1, Image::Color(256, 0, 0, 255)), "color channels");
+Error(Image::Create(1, 1, Image::Color(0, -1, 0, 255)), "color channels");
+Error(Image::Create(1, 1, Image::Color(0, 0, 256, 255)), "color channels");
+Error(Image::Create(1, 1, Image::Color(0, 0, 0, -1)), "color channels");
+
+def image = Require(Image::Create(1, 1, black));
+Error(Image::GetPixel(image, -1, 0), "coordinates");
+Error(Image::GetPixel(image, 0, 1), "coordinates");
+Error(Image::SetPixel(image, 1, 0, black), "coordinates");
+Error(Image::SetPixel(image, 0, 0, Image::Color(0, 0, 0, 256)), "color channels");
+Error(Image::Write(image, "target/errors.gif"), "output extension");
+Error(Image::WriteJpeg(image, "target/errors.jpg", 0), "quality");
+Error(Image::WriteJpeg(image, "target/errors.jpg", 101), "quality");
+Result::ResultUnwrapOrPanic(IO::TryWriteFile("target/corrupt-image.png", "not an image"), "write corrupt fixture");
+Error(Image::Read("target/corrupt-image.png"), "unsupported image format");
+Result::ResultUnwrapOrPanic(IO::TryDeleteFile("target/corrupt-image.png"), "delete fixture");
+Require(Image::Close(image));
+Error(Image::Width(image), "closed or invalid");
+Error(Image::Height(image), "closed or invalid");
+Error(Image::GetPixel(image, 0, 0), "closed or invalid");
+Error(Image::Write(image, "target/closed.png"), "closed or invalid");
+Error(Image::Close(image), "closed or invalid");
+IO::PrintLine("Image failures return errors, including Unicode paths");

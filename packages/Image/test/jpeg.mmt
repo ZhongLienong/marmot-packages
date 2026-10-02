@@ -1,0 +1,36 @@
+module ImageJpeg
+import { <Image>, <IO>, <Prelude.Result>, <Prelude.Panic> }
+use Result.{
+    Result
+}
+
+def Assert = fn(condition: Bool, message: Text) -> Unit => {
+    if condition then () else Panic::Panic(message)
+};
+
+def Require = fn<T>(result: Result<T, Image::ImageError>) -> T => {
+    match result with
+        case Result::Ok(value) => value
+        case Result::Err(error) => Panic::Panic(error.message)
+};
+
+def Verify = fn(path: Text) -> Unit => {
+    def loaded = Require(Image::Read(path));
+    Assert(Require(Image::Width(loaded)) == 16, "JPEG width");
+    Assert(Require(Image::Height(loaded)) == 16, "JPEG height");
+    def pixel = Require(Image::GetPixel(loaded, 8, 8));
+    Assert((pixel.r >= 221) && (pixel.r <= 227), "JPEG red tolerance");
+    Assert((pixel.g >= 29) && (pixel.g <= 35), "JPEG green tolerance");
+    Assert((pixel.b >= 13) && (pixel.b <= 19), "JPEG blue tolerance");
+    Assert(pixel.a == 255, "JPEG discards alpha");
+    Require(Image::Close(loaded));
+    Result::ResultUnwrapOrPanic(IO::TryDeleteFile(path), "delete JPEG");
+};
+
+def image = Require(Image::Create(16, 16, Image::Color(224, 32, 16, 0)));
+Require(Image::WriteJpeg(image, "target/jpeg-quality.data", 95));
+Verify("target/jpeg-quality.data");
+Require(Image::Write(image, "target/jpeg-default.JPG"));
+Verify("target/jpeg-default.JPG");
+Require(Image::Close(image));
+IO::PrintLine("JPEG supports explicit quality and RGB output");
