@@ -78,6 +78,22 @@ entry! { marmot_image_write_jpeg(args) {
     complete(unsafe { text(args, 1) }.and_then(|path| images::write(unsafe { integer(args, 0) }, Path::new(&path), Some(unsafe { integer(args, 2) }))))
 } }
 
+entry! { marmot_image_resize(args) {
+    complete(images::resize(unsafe { integer(args, 0) }, unsafe { integer(args, 1) }, unsafe { integer(args, 2) }))
+} }
+
+entry! { marmot_image_crop(args) {
+    complete(images::crop(unsafe { integer(args, 0) }, unsafe { integer(args, 1) }, unsafe { integer(args, 2) }, unsafe { integer(args, 3) }, unsafe { integer(args, 4) }))
+} }
+
+entry! { marmot_image_flip_horizontal(args) {
+    complete(images::flip_horizontal(unsafe { integer(args, 0) }))
+} }
+
+entry! { marmot_image_flip_vertical(args) {
+    complete(images::flip_vertical(unsafe { integer(args, 0) }))
+} }
+
 entry! { marmot_image_close(args) {
     complete(images::close(unsafe { integer(args, 0) }))
 } }

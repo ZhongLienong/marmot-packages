@@ -3,7 +3,7 @@ import { <Prelude.Result> }
 use Result.{
     Result
 }
-public export { Image, Color, ImageError, Read, Create, Width, Height, GetPixel, SetPixel, Write, WriteJpeg, Close }
+public export { Image, Color, ImageError, Read, Create, Width, Height, GetPixel, SetPixel, Resize, Crop, FlipHorizontal, FlipVertical, Write, WriteJpeg, Close }
 
 type Image = Int;
 
@@ -29,6 +29,14 @@ foreign "marmot_image_height" HeightRaw: fn(Int) -> Int from "marmot_image";
 foreign "marmot_image_get_pixel" GetPixelRaw: fn(Int, Int, Int) -> Int from "marmot_image";
 
 foreign "marmot_image_set_pixel" SetPixelRaw: fn(Int, Int, Int, Int) -> Int from "marmot_image";
+
+foreign "marmot_image_resize" ResizeRaw: fn(Int, Int, Int) -> Int from "marmot_image";
+
+foreign "marmot_image_crop" CropRaw: fn(Int, Int, Int, Int, Int) -> Int from "marmot_image";
+
+foreign "marmot_image_flip_horizontal" FlipHorizontalRaw: fn(Int) -> Int from "marmot_image";
+
+foreign "marmot_image_flip_vertical" FlipVerticalRaw: fn(Int) -> Int from "marmot_image";
 
 foreign "marmot_image_write" WriteRaw: fn(Int, Text) -> Int from "marmot_image";
 
@@ -79,6 +87,18 @@ def SetPixel = fn(image: Image, x: Int, y: Int, color: Color) -> Result<Unit, Im
         case Result::Ok(packed) => Checked(SetPixelRaw(image as Int, x, y, packed), fn(_: Int) -> Unit => ())
         case Result::Err(error) => Result::Err(error)
 };
+
+def Resize = fn(image: Image, width: Int, height: Int) -> Result<Image, ImageError> => {
+    Checked(ResizeRaw(image as Int, width, height), fn(handle: Int) -> Image => handle as Image)
+};
+
+def Crop = fn(image: Image, x: Int, y: Int, width: Int, height: Int) -> Result<Image, ImageError> => {
+    Checked(CropRaw(image as Int, x, y, width, height), fn(handle: Int) -> Image => handle as Image)
+};
+
+def FlipHorizontal = fn(image: Image) -> Result<Unit, ImageError> => Checked(FlipHorizontalRaw(image as Int), fn(_: Int) -> Unit => ());
+
+def FlipVertical = fn(image: Image) -> Result<Unit, ImageError> => Checked(FlipVerticalRaw(image as Int), fn(_: Int) -> Unit => ());
 
 def Write = fn(image: Image, path: Text) -> Result<Unit, ImageError> => Checked(WriteRaw(image as Int, path), fn(_: Int) -> Unit => ());
 

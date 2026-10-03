@@ -1,4 +1,5 @@
 use image::codecs::{jpeg::JpegEncoder, png::PngEncoder, webp::WebPEncoder};
+use image::imageops::{self, FilterType};
 use image::{
     DynamicImage, ExtendedColorType, ImageDecoder, ImageEncoder, ImageReader, Limits, Rgba,
     RgbaImage,
@@ -62,10 +63,16 @@ fn color(packed: i64) -> Result<Rgba<u8>, String> {
     Ok(Rgba(packed.to_be_bytes()))
 }
 
-pub(crate) fn create(width: i64, height: i64, packed: i64) -> Result<i64, String> {
+fn dimensions(width: i64, height: i64) -> Result<(u32, u32), String> {
     let width = u32::try_from(width).map_err(|_| "image width is outside the supported range")?;
     let height =
         u32::try_from(height).map_err(|_| "image height is outside the supported range")?;
+    buffer_length(width, height)?;
+    Ok((width, height))
+}
+
+pub(crate) fn create(width: i64, height: i64, packed: i64) -> Result<i64, String> {
+    let (width, height) = dimensions(width, height)?;
     let length = buffer_length(width, height)?;
     let color = color(packed)?;
     let mut bytes = Vec::new();
@@ -132,6 +139,44 @@ pub(crate) fn set_pixel(id: i64, x: i64, y: i64, packed: i64) -> Result<i64, Str
     with_image(id, |image| {
         let (x, y) = coordinates(image, x, y)?;
         image.put_pixel(x, y, color);
+        Ok(0)
+    })
+}
+
+pub(crate) fn resize(id: i64, width: i64, height: i64) -> Result<i64, String> {
+    let (width, height) = dimensions(width, height)?;
+    // Registering takes the registry lock, so the copy is made under it and
+    // registered after it is released.
+    let resized = with_image(id, |image| {
+        Ok(imageops::resize(image, width, height, FilterType::Triangle))
+    })?;
+    register(resized)
+}
+
+pub(crate) fn crop(id: i64, x: i64, y: i64, width: i64, height: i64) -> Result<i64, String> {
+    let (width, height) = dimensions(width, height)?;
+    let cropped = with_image(id, |image| {
+        let (x, y) = coordinates(image, x, y)?;
+        if u64::from(x) + u64::from(width) > u64::from(image.width())
+            || u64::from(y) + u64::from(height) > u64::from(image.height())
+        {
+            return Err("crop region extends outside the image".into());
+        }
+        Ok(imageops::crop_imm(image, x, y, width, height).to_image())
+    })?;
+    register(cropped)
+}
+
+pub(crate) fn flip_horizontal(id: i64) -> Result<i64, String> {
+    with_image(id, |image| {
+        imageops::flip_horizontal_in_place(image);
+        Ok(0)
+    })
+}
+
+pub(crate) fn flip_vertical(id: i64) -> Result<i64, String> {
+    with_image(id, |image| {
+        imageops::flip_vertical_in_place(image);
         Ok(0)
     })
 }

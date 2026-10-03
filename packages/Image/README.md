@@ -26,22 +26,22 @@ python scripts/check.py
 
 ## Use
 
-Build the native library before installing the package into an application.
-Add the collection to your application's `project.marmot`, using the correct
-relative path for your checkout:
+Add the dependency to your application's `project.marmot` and run
+`marmot install`:
 
 ```toml
-[project]
-marmot_path = ["../marmot-packages/packages"]
-
 [dependencies]
-Image = "^0.1.0"
+Image = "^0.2.0"
 ```
 
-Merge these fields into the existing manifest, then run `marmot install`.
-Import the module with `import { <Image> }`. The native library is included in
-the vendored package. After rebuilding an already installed version, remove its
-vendored `packages/Image-0.1.0/` folder and run `marmot install` again: Marmot's
+Marmot downloads the release with the native library prebuilt for Windows x64,
+Linux x86_64, or macOS, and vendors both into the project. Import the module
+with `import { <Image> }`.
+
+To use a local build instead, build the native library and add the collection
+to `[project].marmot_path`, for example `["../marmot-packages/packages"]`.
+After rebuilding an already installed version, remove its vendored
+`packages/Image-0.2.0/` folder and run `marmot install` again: Marmot's
 current source checksum does not include native binaries.
 
 From `packages/Image/`, try the included example:
@@ -65,6 +65,9 @@ Every operation returns `Result<T, Image::ImageError>`. On failure,
 | `Width(image)`, `Height(image)` | `Int` | Read dimensions |
 | `GetPixel(image, x, y)` | `Image::Color` | Read a pixel |
 | `SetPixel(image, x, y, color)` | `Unit` | Change a pixel |
+| `Resize(image, width, height)` | `Image::Image` | Make a resized copy with bilinear filtering |
+| `Crop(image, x, y, width, height)` | `Image::Image` | Copy the region whose top left is `(x, y)`; it must lie inside the image |
+| `FlipHorizontal(image)`, `FlipVertical(image)` | `Unit` | Mirror the image in place |
 | `Write(image, path)` | `Unit` | Select PNG, JPEG, or WebP from the output extension |
 | `WriteJpeg(image, path, quality)` | `Unit` | Write JPEG at quality 1–100, regardless of extension |
 | `Close(image)` | `Unit` | Release the image buffer |
@@ -79,11 +82,12 @@ without compositing, and uses quality 90 with `Write`. Decoded JPEG alpha is
 255. Output extensions are `.png`, `.jpg`, `.jpeg`, and `.webp`, ignoring case.
 Writing replaces an existing file and does not create parent directories.
 
-Call `Close` once when finished with each image. Handles share a mutable buffer:
+`Resize` and `Crop` return new images, which need their own `Close`; the
+original is unchanged. Call `Close` once when finished with each image. Handles share a mutable buffer:
 copying a handle does not copy its pixels, and closing it invalidates every
 alias. Buffers are owned by the native library and are not reclaimed by
 Marmot's garbage collector. Registry operations are synchronized for use from
 Marmot workers.
 
 This version handles still images only. It does not expose animation,
-metadata, orientation correction, resizing, or conversion to Marmot arrays.
+metadata, orientation correction, rotation, or conversion to Marmot arrays.

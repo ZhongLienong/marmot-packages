@@ -4,7 +4,7 @@ A collection of independently versioned Marmot libraries.
 
 | Package | Version | Purpose |
 | --- | --- | --- |
-| [Image](packages/Image/) | 0.1.0 | PNG, JPEG, and WebP image IO |
+| [Image](packages/Image/) | 0.2.0 | PNG, JPEG, and WebP image IO |
 
 ```text
 marmot-packages/

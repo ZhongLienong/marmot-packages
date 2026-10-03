@@ -104,3 +104,33 @@ fn invalid_output_requests_do_not_truncate_existing_files() {
     assert!(write(source, &directory.path().join("missing/out.png"), None).is_err());
     close(source).unwrap();
 }
+
+#[test]
+fn resizing_and_cropping_make_new_images_and_flips_change_the_original() {
+    let source = create(3, 2, 0x000000ff).unwrap();
+    set_pixel(source, 0, 0, 0xff0000ff).unwrap();
+    set_pixel(source, 2, 1, 0x00ff00ff).unwrap();
+
+    let plain = create(4, 4, 0x336699ff).unwrap();
+    let resized = resize(plain, 7, 2).unwrap();
+    assert_eq!((width(resized).unwrap(), height(resized).unwrap()), (7, 2));
+    assert_eq!(get_pixel(resized, 6, 1).unwrap(), 0x336699ff);
+    assert_eq!(get_pixel(plain, 3, 3).unwrap(), 0x336699ff);
+    assert!(resize(plain, 0, 4).is_err());
+    close(resized).unwrap();
+    close(plain).unwrap();
+
+    let cropped = crop(source, 1, 1, 2, 1).unwrap();
+    assert_eq!((width(cropped).unwrap(), height(cropped).unwrap()), (2, 1));
+    assert_eq!(get_pixel(cropped, 1, 0).unwrap(), 0x00ff00ff);
+    assert!(crop(source, 2, 0, 2, 1).is_err());
+    assert!(crop(source, 3, 0, 1, 1).is_err());
+    close(cropped).unwrap();
+
+    flip_horizontal(source).unwrap();
+    assert_eq!(get_pixel(source, 2, 0).unwrap(), 0xff0000ff);
+    flip_vertical(source).unwrap();
+    assert_eq!(get_pixel(source, 2, 1).unwrap(), 0xff0000ff);
+    assert_eq!(get_pixel(source, 0, 0).unwrap(), 0x00ff00ff);
+    close(source).unwrap();
+}

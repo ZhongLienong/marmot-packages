@@ -1,0 +1,50 @@
+module ImageTransform
+import { <Image>, <IO>, <Prelude.Result>, <Prelude.Panic> }
+use Result.{
+    Result
+}
+
+def Assert = fn(condition: Bool, message: Text) -> Unit => {
+    if condition then () else Panic::Panic(message)
+};
+
+def Require = fn<T>(result: Result<T, Image::ImageError>) -> T => {
+    match result with
+        case Result::Ok(value) => value
+        case Result::Err(error) => Panic::Panic(error.message)
+};
+
+def Refused = fn<T>(result: Result<T, Image::ImageError>, message: Text) -> Unit => {
+    match result with
+        case Result::Ok(_) => Panic::Panic(message)
+        case Result::Err(_) => ()
+};
+
+def red = Image::Color(255, 0, 0, 255);
+
+def green = Image::Color(0, 255, 0, 255);
+
+def image = Require(Image::Create(3, 2, Image::Color(0, 0, 0, 255)));
+Require(Image::SetPixel(image, 0, 0, red));
+Require(Image::SetPixel(image, 2, 1, green));
+
+def resized = Require(Image::Resize(image, 6, 5));
+Assert(Require(Image::Width(resized)) == 6, "resized width");
+Assert(Require(Image::Height(resized)) == 5, "resized height");
+Assert(Require(Image::Width(image)) == 3, "resize keeps the original");
+Refused(Image::Resize(image, 0, 1), "empty resize");
+Require(Image::Close(resized));
+
+def cropped = Require(Image::Crop(image, 1, 1, 2, 1));
+Assert(Require(Image::Width(cropped)) == 2, "cropped width");
+Assert(Require(Image::GetPixel(cropped, 1, 0)).g == 255, "cropped pixel");
+Refused(Image::Crop(image, 2, 0, 2, 1), "crop past the edge");
+Require(Image::Close(cropped));
+
+Require(Image::FlipHorizontal(image));
+Assert(Require(Image::GetPixel(image, 2, 0)).r == 255, "horizontal flip");
+Require(Image::FlipVertical(image));
+Assert(Require(Image::GetPixel(image, 2, 1)).r == 255, "vertical flip");
+Assert(Require(Image::GetPixel(image, 0, 0)).g == 255, "both flips");
+Require(Image::Close(image));
+IO::PrintLine("Resize and crop copy; flips change the image");
