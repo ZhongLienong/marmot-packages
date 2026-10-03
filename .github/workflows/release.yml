@@ -1,0 +1,85 @@
+name: Release package
+
+on:
+  push:
+    tags:
+      - "*-v*"
+
+permissions:
+  contents: write
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  TAG: ${{ github.ref_name }}
+
+jobs:
+  source:
+    name: Source
+    runs-on: ubuntu-24.04
+    outputs:
+      name: ${{ steps.package.outputs.name }}
+      native: ${{ steps.package.outputs.native }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Describe package
+        id: package
+        run: python scripts/release.py describe "$TAG" >> "$GITHUB_OUTPUT"
+      - name: Archive sources
+        run: python scripts/release.py source "$TAG" --output dist
+      # A draft is invisible to Marmot until every asset is attached.
+      - name: Create draft release
+        run: gh release create "$TAG" dist/* --draft --verify-tag --title "$TAG" --repo "$GITHUB_REPOSITORY"
+
+  native:
+    name: Native (${{ matrix.platform }})
+    needs: source
+    if: needs.source.outputs.native == 'true'
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: windows-2025
+            platform: windows_x64
+          # The oldest supported runner, so the library loads on older glibc.
+          - os: ubuntu-22.04
+            platform: linux_x86_64
+          - os: macos-15
+            platform: macos_arm64
+          - os: macos-15-intel
+            platform: macos_x86_64
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Set up Rust
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal
+          rustup override set 1.88.0
+      - name: Build native library
+        run: python "packages/${{ needs.source.outputs.name }}/native/build.py"
+      - name: Archive library
+        run: python scripts/release.py native "$TAG" --platform "${{ matrix.platform }}" --output dist
+      - name: Upload library
+        run: gh release upload "$TAG" dist/* --repo "$GITHUB_REPOSITORY"
+
+  publish:
+    name: Publish
+    needs: [source, native]
+    if: ${{ !cancelled() && needs.source.result == 'success' && needs.native.result != 'failure' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Publish release
+        run: gh release edit "$TAG" --draft=false --repo "$GITHUB_REPOSITORY"

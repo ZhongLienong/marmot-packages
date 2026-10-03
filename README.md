@@ -59,25 +59,23 @@ toolchain. Toolchain builds are skipped while the collection is empty.
 
 ## Using the collection
 
-Clone this repository and build any native libraries you need, for example:
+Declare package versions under `[dependencies]` and run `marmot install`.
+Marmot downloads released versions from this repository, with the prebuilt
+native library for the current platform, and vendors them into the project.
 
-```text
-python packages/Image/native/build.py
-```
-
-Then add its `packages/` directory to an application's existing
-`[project].marmot_path` list. Declare package versions under
-`[dependencies]` and run `marmot install` to vendor the selected sources.
-
-Marmot currently resolves local directories; it does not download this
-repository or retrieve package versions from Git tags.
+To work against unreleased sources instead, clone this repository, build any
+native libraries you need (for example `python packages/Image/native/build.py`)
+and add its `packages/` directory to the application's `[project].marmot_path`.
 
 ## Releases
 
-Version each package in its own `package.marmot`. Tag releases as
-`Name-v0.1.0`, and keep released tags unchanged. The checked-out branch exposes
-the versions present in its manifests; tags alone do not make older versions
-available to the resolver.
+Version each package in its own `package.marmot`, then push a tag named
+`Name-v0.1.0` for that version. `.github/workflows/release.yml` publishes a
+GitHub release with the package's sources and, for packages with native code,
+the library built for Windows x64, Linux x86_64 and macOS arm64 and x86_64. The
+release stays a draft until every build succeeds. Keep released tags unchanged.
+
+`python scripts/release.py` builds the same assets locally into `dist/`.
 
 Generated targets, native libraries, and each package's vendored dependencies
 are ignored. The top-level `packages/` source collection remains tracked.
